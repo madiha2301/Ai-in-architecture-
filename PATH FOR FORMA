@@ -1,0 +1,106 @@
+AI Plugins for Design Concepts & Massing in Revit — Beginner Guide (Windows)
+This tutorial focuses specifically on Revit and the two real categories of AI tools people mean when they say "AI plugins for Revit":
+Path A — Autodesk AI (Autodesk Forma): Autodesk's own AI-driven massing/site generator, connected to Revit via an official extension. Best starting point — no coding, fully supported.
+Path B — Chatbot-style AI (Dynamo + ChatGPT/LLM node): A conversational AI plugin inside Revit's visual scripting tool (Dynamo) that lets you type natural-language prompts to help generate or adjust parametric massing logic.
+Path C — Third-party generative feasibility (TestFit): An external AI tool purpose-built for fast massing/unit-mix studies, which exports directly into Dynamo/Revit.
+You'll set up and use all three at a beginner level, so you understand the real landscape rather than just one tool.
+---
+Prerequisites
+Windows 10/11, 64-bit
+Revit 2024–2026 installed
+An Autodesk Account (for Forma — free trial tier available)
+Revit's built-in Dynamo (ships free with Revit — no separate install)
+An OpenAI API key if you want to try Path B's ChatGPT node (free to create, pay-per-use)
+A TestFit account (free trial) if trying Path C
+Stable internet connection (all three are cloud-connected)
+---
+PATH A — Autodesk AI (Forma) → Revit
+Step 1: Create a Forma proposal
+Go to `forma.autodesk.com`, sign in with your Autodesk ID.
+Click New Proposal, search your site address — Forma auto-pulls terrain and context.
+Use the Site Boundary tool (dashed-polygon icon) to trace your property line; double-click to close it, `Esc` to exit.
+Step 2: Verify your Access and Location to create Building Design Data for AI purposes
+Goto AutoDesk Forma Design URL: https://forma.aus.autodesk.com/app-home?utm_source=aum
+Click on Building Design Button and try to enter program inputs (target GFA, floor count, building type, setbacks).
+Next steps will be shared in the classroom session...
+Step 3: Bring it into Revit - "Please Hold-Off on below steps"
+In Revit: `Add-Ins` tab → check for Forma panel. If missing, install "Forma extension for Revit" from the Autodesk App Store, restart Revit.
+Click `Forma` → `Get Massing`, sign in, pick your saved proposal, click Import.
+It arrives as an in-place mass, geo-positioned automatically.
+Convert it: select the mass → `Massing & Site` tab → `Model by Face` → `Wall` / `Floor` / `Roof`.
+Commands & shortcuts - These will be explained in the Classroom sessions
+Action	Shortcut/Path
+Show/hide mass	`GM`
+Wall by Face	`WF`
+Floor/Roof by Face	`Massing & Site` → `Model by Face`
+Zoom extents	`ZE`
+3D view	`3D`
+---
+PATH B — Chatbot-style AI Plugin (Dynamo + ChatGPT node)
+This is the literal "ChatBot in Revit" experience: a Dynamo custom node exists that calls the ChatGPT API for chat completion directly inside your Dynamo graph, which drives Revit geometry.
+Step 1: Open Dynamo from Revit
+In Revit, go to `Manage` tab → `Visual Programming` panel → click Dynamo.
+Dynamo opens in a new window. Click New to start a blank graph.
+Step 2: Install the ChatGPT node package
+In Dynamo, go to `Packages` menu → `Search for a Package`.
+Search for a ChatGPT/OpenAI completion node package (community packages exist under names like "ChatGPT" or "OpenAI Dynamo").
+Click Install, accept the terms, restart Dynamo when prompted.
+Step 3: Wire up your first AI-assisted prompt
+Drag the ChatGPT node onto the canvas.
+Add a Code Block or String node, type your prompt in quotes, e.g. `"Suggest 3 massing strategies for a 4-story mixed-use building on a narrow urban infill site"`.
+Connect the String node's output to the ChatGPT node's prompt input.
+Add your API key into the node's key input field (or a String node feeding it) — never hardcode it into a graph you'll share publicly.
+Run the graph (`F5` or the Run button, bottom-left of Dynamo).
+The node returns text output — use it as design guidance, or parse specific numbers (like unit counts or floor heights) into downstream nodes that actually generate massing geometry (e.g., `Solid.ByLoft`, `Cuboid.ByLengths`) parametrically.
+Commands & shortcuts (Dynamo)
+Action	Shortcut
+Run graph	`F5`
+Pan canvas	Hold middle mouse button, drag
+Zoom	Mouse scroll wheel
+Search node library	`Ctrl+Space`
+Delete selected node	`Delete`
+Undo	`Ctrl+Z`
+---
+PATH C — TestFit → Dynamo/Revit
+Step 1: Build a feasibility study in TestFit
+Go to your TestFit account, start a new Site project.
+Draw or import your site boundary.
+Pick a building typology preset (wrap, podium, tower, donut, hotel) and set unit mix / parking targets.
+TestFit's AI generates optimized massing and unit layouts in seconds — adjust sliders to explore variants live.
+Step 2: Bring it into Revit
+From TestFit, use the export option to send data to Dynamo/Revit (TestFit integrates with Dynamo as the bridge into Revit).
+In Revit's Dynamo window, run the corresponding TestFit import graph/package to rebuild the massing as native Revit geometry.
+Convert resulting masses to walls/floors/roofs as in Path A, Step 3.
+---
+Common Mistakes to Avoid
+Trusting AI output as final/code-compliant. All three tools (Forma, ChatGPT node, TestFit) produce starting points — always verify against local zoning and building code yourself.
+Skipping the site boundary step in Forma or TestFit. Massing generated without a defined boundary ignores your actual property line/setbacks.
+Hardcoding API keys in Dynamo graphs. If you share or version-control a graph with your OpenAI key typed directly into a node, anyone with the file can use your key. Use a separate input node or environment variable instead.
+Leaving masses visible in construction documents. After `Model by Face` conversion, forgetting to hide the original mass (`GM`) causes duplicate geometry in views/schedules.
+Ignoring performance analysis. Picking the massing option that "looks best" without running Forma's Sun/Wind/Noise analysis defeats the purpose of using an AI+data workflow.
+Running Dynamo graphs with no internet. ChatGPT and Forma nodes/extensions require a live connection — a network drop mid-run causes silent failures or timeouts.
+---
+Optimization Tips
+Be specific in your Forma program inputs and ChatGPT prompts. Vague inputs = vague/irrelevant AI output. "4-story mixed-use, 30% ground-floor retail, urban infill" beats "a building."
+Batch your Forma analyses (Sun + Wind + Noise together on 3–4 shortlisted options) rather than one at a time — it runs in parallel in the cloud.
+Keep AI-imported masses on their own workset in team Revit files so they can be isolated/hidden without disturbing other disciplines.
+Purge unused elements regularly (`Manage` → `Purge Unused`) after multiple AI-generated imports — each iteration can bloat file size.
+Save Dynamo graphs as reusable custom nodes once a ChatGPT-assisted workflow proves useful, so you're not rebuilding the wiring every project.
+Version your TestFit/Forma iterations as separate proposals, not overwritten edits, so you can compare AI-generated options side by side later.
+---
+If Something Goes Wrong
+Problem	Fix
+Forma panel missing from Revit's Add-Ins tab	Reinstall the Forma extension from Autodesk App Store; confirm same Autodesk ID signed in everywhere; restart Revit.
+ChatGPT node in Dynamo returns an error/blank	Check your API key is valid and has available quota/credits; confirm internet connection; check the prompt input is a valid String node, not disconnected.
+Dynamo graph won't run (`F5` does nothing)	Look for red-outlined nodes — these have missing/invalid inputs; hover to see the error tooltip.
+Forma "Get Massing" import fails/times out	Ensure your Forma proposal is fully saved (not mid-edit) in-browser before importing; check connection.
+Imported mass appears in wrong location	`Manage` → `Location` → `Site Location`; confirm it matches your Forma/TestFit project address; re-import.
+TestFit-to-Dynamo import produces nothing	Confirm you exported to the correct format/package version expected by your Dynamo graph; re-check TestFit's export settings.
+Revit slows down after several AI imports	`Manage` → `Purge Unused`; delete earlier rejected mass imports you no longer need.
+"Model by Face" does nothing when clicked	You selected an edge/vertex, not a face — click a flat mass surface directly, then retry.
+---
+Quick Recap
+`Forma (Autodesk AI): site → AI massing options → Sun/Wind/Noise analysis → Get Massing into Revit`
+`Dynamo (ChatGPT node): open Dynamo → install ChatGPT package → prompt → parse into geometry nodes`
+`TestFit (AI feasibility): typology + program → AI-optimized massing → export via Dynamo/Revit → Model by Face`
+All three converge on the same final Revit step: convert imported/generated massing into real walls, floors, and roofs via `Model by Face`, then continue detailed BIM work as normal.
