@@ -1,0 +1,86 @@
+if 8 > 2:
+  print("eight is greater than two!")
+ 
+  x = 10
+y = "hinata's jersey no"
+print (y,x)
+#oh i see i had done a mistake and now i understood it 
+
+print("okay i am learning the statements section on sintax")
+print ("oh i see"); print ("this is how u use a semicolons")
+
+print('oh makes it easier to use single quotes too i had did that but thought it was wrong now i know it isnt really')
+print('ohh wait if u write one below the other', end="") 
+print('it can still show up on the same line with the end='' sommand thats cool and new ')
+
+print('number time')
+print ('i am 21 year old') 
+#hey i can just make a line of this but we could also code the same thing 
+print('hey','i am',21,'year old')
+#broo this i stime taking but im sure will be necessary and here we dint use semicolon i wonder what happens if i chnange the comma
+
+#oh its an error i see, so that semicolon is used when ur saying the print command on the same line and comas in between it
+print('lets now make the code add randome huge numbers')
+print ('509873 + 63892');print(509873 + 63892)
+print('now multiply'); print('53828 x 63822'); print (53828 * 63822)
+
+print('ohh so we can use """ insetad of # for like a para of comments intsead of a line')
+"""
+i see im typing a comment right now
+and i dont have the hasel to keep typing hastag eachtime i 
+go 
+to 
+a
+next
+line !! 
+
+"""
+
+print('okay variable time now')
+M = 'madiha'
+m = 'mariyam'
+print(M, m)
+print(m) ; print('is my 2nd name')
+print(M);print('is my 1st name')
+
+print('wait buts casting ? whats str int and float')
+"""
+okay wait i need to ask this doubt to sir
+i hope i can understand and remember those commands
+i wonder why w3school dint elobrate on the use and relate that to the outout 
+"""
+
+madiha='mariyam'
+mariyam='madiha'
+print( mariyam); print(madiha)
+#oh i see we cant just place the 2 variables next to eachother it becomes a whole new variable lets find out 
+#oh u cant really put space in between variables i see 
+print('ok now ,ore variables lets try ')
+a,b,c = 'i', 'love','python'
+print (a, end='');print (b, end="");print(c)
+'''
+oh what i used the end='' command but there is no space at all 
+intresting
+'''
+m = M ='madiha'
+print (m)
+print(M)
+
+#oh another way 
+numbers = ['one','two','three']
+a, b, c = numbers 
+#oh i tried numbers it dint take it 
+#does that mean only alphetes can be variables and not numbers?
+print(a);print(b);print(c)
+M='madiha'
+m='mariyam'
+print(M + m)
+'''
+why am i not able to put space 
+between my name w3 schools output shows space 
+howwww
+'''
+
+print ('ok thats it for todat ill next learn global variable ')
+print ('untill then mm on 1st oct sighning off') 
+
