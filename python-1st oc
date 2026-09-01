@@ -48,6 +48,9 @@ print('wait buts casting ? whats str int and float')
 okay wait i need to ask this doubt to sir
 i hope i can understand and remember those commands
 i wonder why w3school dint elobrate on the use and relate that to the outout 
+str letters 
+int - numbers
+float decimble 
 """
 
 madiha='mariyam'
@@ -74,11 +77,13 @@ a, b, c = numbers
 print(a);print(b);print(c)
 M='madiha'
 m='mariyam'
-print(M + m)
+# concatenating string variables and empty space 
+print(M + ' ' + m)
 '''
 why am i not able to put space 
 between my name w3 schools output shows space 
 howwww
+
 '''
 
 print ('ok thats it for todat ill next learn global variable ')
