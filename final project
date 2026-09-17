@@ -1,0 +1,657 @@
+from google.colab import drive
+drive.mount('/content/drive')   # just this — always the same, every time
+
+import os
+
+LIBRARY_DIR = '/content/drive/MyDrive/data set/images'   # your actual folder path goes here instead
+
+print(os.listdir('/content/drive/MyDrive'))
+
+for folder in os.listdir('/content/drive/MyDrive'):
+    print(folder)
+
+LIBRARY_DIR = '/content/drive/MyDrive/form/images'
+
+print(os.listdir('/content/drive/MyDrive/form'))
+
+LIBRARY_DIR = '/content/drive/MyDrive/form/raw_pages'
+print(os.listdir(LIBRARY_DIR))
+
+import tensorflow as tf
+import numpy as np
+
+IMG_SIZE = (224, 224)
+
+feature_extractor = tf.keras.applications.MobileNetV2(
+    input_shape=IMG_SIZE + (3,),
+    include_top=False,
+    weights='imagenet',
+    pooling='avg'
+)
+
+def get_embedding(img_path):
+    img = tf.keras.utils.load_img(img_path, target_size=IMG_SIZE)
+    img_array = tf.keras.utils.img_to_array(img)
+    img_array = tf.keras.applications.mobilenet_v2.preprocess_input(img_array)
+    img_array = tf.expand_dims(img_array, 0)
+    embedding = feature_extractor.predict(img_array, verbose=0)
+    return embedding[0]
+
+import pickle
+
+VALID_EXT = ('.jpg', '.jpeg', '.png', '.webp')
+
+library_files = [f for f in os.listdir(LIBRARY_DIR) if f.lower().endswith(VALID_EXT)]
+print(f"Found {len(library_files)} images in your library.")
+
+embeddings_db = {}
+
+for i, filename in enumerate(library_files):
+    path = os.path.join(LIBRARY_DIR, filename)
+    embeddings_db[filename] = get_embedding(path)
+    if (i + 1) % 20 == 0:
+        print(f"Processed {i+1}/{len(library_files)}")
+
+with open('/content/drive/MyDrive/form/embeddings.pkl', 'wb') as f:
+    pickle.dump(embeddings_db, f)
+
+print("Done! Embeddings saved.")
+
+
+from numpy.linalg import norm
+
+def cosine_similarity(a, b):
+    return np.dot(a, b) / (norm(a) * norm(b))
+
+def find_similar(query_img_path, top_n=5):
+    query_embedding = get_embedding(query_img_path)
+
+    scores = []
+    for filename, emb in embeddings_db.items():
+        sim = cosine_similarity(query_embedding, emb)
+        scores.append((filename, sim))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return scores[:top_n]
+
+!pip install opencv-python-headless -q
+
+import cv2
+import numpy as np
+import os
+import matplotlib.pyplot as plt
+from PIL import Image
+
+RAW_PAGES_DIR = '/content/drive/MyDrive/form/raw_pages'
+CROPPED_DIR = '/content/drive/MyDrive/form/images_cropped'
+
+os.makedirs(RAW_PAGES_DIR, exist_ok=True)
+os.makedirs(CROPPED_DIR, exist_ok=True)
+
+print("Put your full-page scans into:", RAW_PAGES_DIR)
+
+def crop_forms_from_page(image_path, output_dir, page_name,
+                          min_area=3000, padding=15, show_preview=False):
+    img = cv2.imread(image_path)
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))   # smaller kernel
+    dilated = cv2.dilate(thresh, kernel, iterations=1)             # fewer iterations
+
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    h, w = img.shape[:2]
+    saved_count = 0
+    preview_img = img.copy()
+
+    for i, cnt in enumerate(contours):
+        area = cv2.contourArea(cnt)
+        if area < min_area:
+            continue
+
+        x, y, cw, ch = cv2.boundingRect(cnt)
+
+        # Skip boxes that are unusually wide/tall relative to page (likely text labels or the whole page)
+        box_w_ratio = cw / w
+        box_h_ratio = ch / h
+        if box_w_ratio > 0.6 or box_h_ratio > 0.6:
+            continue
+
+        x1 = max(x - padding, 0)
+        y1 = max(y - padding, 0)
+        x2 = min(x + cw + padding, w)
+        y2 = min(y + ch + padding, h)
+
+        crop = img[y1:y2, x1:x2]
+
+        out_path = os.path.join(output_dir, f"{page_name}_form{saved_count}.jpg")
+        cv2.imwrite(out_path, crop)
+        saved_count += 1
+
+        if show_preview:
+            cv2.rectangle(preview_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+
+    if show_preview:
+        plt.figure(figsize=(10, 12))
+        plt.imshow(cv2.cvtColor(preview_img, cv2.COLOR_BGR2RGB))
+        plt.title(f"{page_name}: found {saved_count} form(s)")
+        plt.axis('off')
+        plt.show()
+
+    return saved_count
+
+test_pages = os.listdir(RAW_PAGES_DIR)
+print("Available pages:", test_pages)
+
+if test_pages:
+    test_file = test_pages[0]
+    test_path = os.path.join(RAW_PAGES_DIR, test_file)
+
+    count = crop_forms_from_page(
+        test_path, CROPPED_DIR, page_name="test",
+        min_area=5000, padding=15, show_preview=True
+    )
+    print(f"Found {count} form(s) on this test page.")
+
+LIBRARY_DIR = '/content/drive/MyDrive/form/Zoom'
+print(os.listdir(LIBRARY_DIR))
+
+VALID_EXT = ('.jpg', '.jpeg', '.png', '.webp')
+
+library_files = [f for f in os.listdir(LIBRARY_DIR) if f.lower().endswith(VALID_EXT)]
+print(f"Found {len(library_files)} images in your library.")
+
+embeddings_db = {}
+
+for i, filename in enumerate(library_files):
+    path = os.path.join(LIBRARY_DIR, filename)
+    embeddings_db[filename] = get_embedding(path)
+
+print("Done! Embeddings rebuilt from cropped shapes.")
+
+test_filename = library_files[0]
+query_path = os.path.join(LIBRARY_DIR, test_filename)
+results = find_similar(query_path, top_n=5)
+show_results(query_path, results)
+
+LIBRARY_DIR = '/content/drive/MyDrive/form/Zoom'  # or wherever your full set ends up
+
+library_files = [f for f in os.listdir(LIBRARY_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.webp'))]
+print(f"Found {len(library_files)} images in your library.")
+
+embeddings_db = {}
+for filename in library_files:
+    path = os.path.join(LIBRARY_DIR, filename)
+    embeddings_db[filename] = get_embedding(path)
+
+import pickle
+with open('/content/drive/MyDrive/form/embeddings_final.pkl', 'wb') as f:
+    pickle.dump(embeddings_db, f)
+
+print("Final embeddings database built and saved!")
+
+import json
+import os
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+def load_database():
+    if os.path.exists(DB_PATH):
+        with open(DB_PATH, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_database(db):
+    with open(DB_PATH, 'w') as f:
+        json.dump(db, f, indent=2)
+
+form_db = load_database()
+print(f"Loaded database with {len(form_db)} form(s) already recorded.")def add_form(image_filename, blocks, notes=""):
+    form_db[image_filename] = {
+        "blocks": blocks,
+        "notes": notes
+    }
+    save_database(form_db)
+    print(f"Saved '{image_filename}' to the database. Total forms recorded: {len(form_db)}")
+
+add_form(
+    image_filename="form_02.jpg",
+    blocks=[
+        {"name": "base",   "size": (4.0, 3.0, 2.0), "position": (0, 0, 0)},
+        {"name": "top_box", "size": (2.0, 2.0, 1.5), "position": (1.0, 0.5, 2.0)}
+    ],
+    notes="Base block with smaller box stacked on top, offset to one side"
+)
+
+
+for filename, entry in form_db.items():
+    print(f"\n{filename}  —  {entry['notes']}")
+    for b in entry["blocks"]:
+        print(f"   {b['name']}: size={b['size']}, position={b['position']}")
+
+import json
+import os
+import trimesh
+import numpy as np
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+# Load existing database (or start a new one if it doesn't exist yet)
+if os.path.exists(DB_PATH):
+    with open(DB_PATH, 'r') as f:
+        form_db = json.load(f)
+else:
+    form_db = {}
+
+def add_form(image_filename, blocks, notes=""):
+    form_db[image_filename] = {"blocks": blocks, "notes": notes}
+    with open(DB_PATH, 'w') as f:
+        json.dump(form_db, f, indent=2)
+    print(f"Saved '{image_filename}' to the database.")
+
+def export_form(image_filename, output_dir='/content/drive/MyDrive/form/massing_exports'):
+    blocks = form_db[image_filename]["blocks"]
+    os.makedirs(output_dir, exist_ok=True)
+
+    meshes = []
+    for b in blocks:
+        box = trimesh.creation.box(extents=b["size"])
+        offset = np.array(b["position"]) + np.array(b["size"]) / 2
+        box.apply_translation(offset)
+        meshes.append(box)
+
+    combined = trimesh.util.concatenate(meshes)
+    name_no_ext = os.path.splitext(image_filename)[0]
+    obj_path = os.path.join(output_dir, f"{name_no_ext}.obj")
+    combined.export(obj_path)
+
+    print(f"Exported: {obj_path}")
+    combined.show()
+    return obj_path
+
+
+# ---- STEP 1: Save dimensions for form_02.jpg (edit these numbers to match your sketch) ----
+add_form(
+    image_filename="form_02.jpg",
+    blocks=[
+        {"name": "base",    "size": (4.0, 3.0, 2.0), "position": (0, 0, 0)},
+        {"name": "top_box", "size": (2.0, 2.0, 1.5), "position": (1.0, 0.5, 2.0)}
+    ],
+    notes="Base block with smaller box on top"
+)
+
+# ---- STEP 2: Generate and preview the 3D model ----
+export_form("form_02.jpg")
+
+!pip install trimesh rhino3dm -q
+
+import json
+import os
+import trimesh
+import numpy as np
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+# Load existing database (or start a new one if it doesn't exist yet)
+if os.path.exists(DB_PATH):
+    with open(DB_PATH, 'r') as f:
+        form_db = json.load(f)
+else:
+    form_db = {}
+
+def add_form(image_filename, blocks, notes=""):
+    form_db[image_filename] = {"blocks": blocks, "notes": notes}
+    with open(DB_PATH, 'w') as f:
+        json.dump(form_db, f, indent=2)
+    print(f"Saved '{image_filename}' to the database.")
+
+def export_form(image_filename, output_dir='/content/drive/MyDrive/form/massing_exports'):
+    blocks = form_db[image_filename]["blocks"]
+    os.makedirs(output_dir, exist_ok=True)
+
+    meshes = []
+    for b in blocks:
+        box = trimesh.creation.box(extents=b["size"])
+        offset = np.array(b["position"]) + np.array(b["size"]) / 2
+        box.apply_translation(offset)
+        meshes.append(box)
+
+    combined = trimesh.util.concatenate(meshes)
+    name_no_ext = os.path.splitext(image_filename)[0]
+    obj_path = os.path.join(output_dir, f"{name_no_ext}.obj")
+    combined.export(obj_path)
+
+    print(f"Exported: {obj_path}")
+    combined.show()
+    return obj_path
+
+
+# ---- STEP 1: Save dimensions for form_02.jpg (edit these numbers to match your sketch) ----
+add_form(
+    image_filename="form_02.jpg",
+    blocks=[
+        {"name": "base",    "size": (4.0, 3.0, 2.0), "position": (0, 0, 0)},
+        {"name": "top_box", "size": (2.0, 2.0, 1.5), "position": (1.0, 0.5, 2.0)}
+    ],
+    notes="Base block with smaller box on top"
+)
+
+# ---- STEP 2: Generate and preview the 3D model ----
+export_form("form_02.jpg")
+
+
+!pip install trimesh -q
+
+import trimesh
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import random
+
+import json
+import os
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+with open(DB_PATH, 'r') as f:
+    form_db = json.load(f)
+
+# Change this to whichever form you already saved (e.g. "form_02.jpg")
+FORM_TO_USE = "form_02.jpg"
+
+base_blocks = form_db[FORM_TO_USE]["blocks"]
+
+print(f"Loaded '{FORM_TO_USE}' from your database:")
+for b in base_blocks:
+    print(f"   {b['name']}: size={b['size']}, position={b['position']}")
+
+import random
+
+def generate_variations(base_blocks, num_variations=4, variation_amount=0.3):
+    variations = []
+    for _ in range(num_variations):
+        new_blocks = []
+        for b in base_blocks:
+            factor = 1 + random.uniform(-variation_amount, variation_amount)
+            new_size = tuple(round(s * factor, 2) for s in b["size"])
+            new_position = tuple(round(p * factor, 2) for p in b["position"])
+            new_blocks.append({"name": b["name"], "size": new_size, "position": new_position})
+        variations.append(new_blocks)
+    return variations
+
+variations = generate_variations(base_blocks, num_variations=4, variation_amount=0.3)
+
+for i, v in enumerate(variations):
+    print(f"\nIteration {i}:")
+    for b in v:
+        print(f"   {b['name']}: size={b['size']}, position={b['position']}")
+
+def draw_blocks(ax, blocks):
+    for b in blocks:
+        x, y, z = b["position"]
+        dx, dy, dz = b["size"]
+        corners = np.array([
+            [x, y, z], [x+dx, y, z], [x+dx, y+dy, z], [x, y+dy, z],
+            [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
+        ])
+        edges = [(0,1),(1,2),(2,3),(3,0), (4,5),(5,6),(6,7),(7,4), (0,4),(1,5),(2,6),(3,7)]
+        for e in edges:
+            p1, p2 = corners[e[0]], corners[e[1]]
+            ax.plot(*zip(p1, p2), color='black')
+
+fig = plt.figure(figsize=(16, 4))
+for i, v in enumerate(variations):
+    ax = fig.add_subplot(1, len(variations), i + 1, projection='3d')
+    draw_blocks(ax, v)
+    ax.set_title(f"Iteration {i}")
+    ax.set_box_aspect([1,1,1])
+plt.tight_layout()
+plt.show()
+
+CHOSEN_ITERATION = 1   # <-- change this to whichever iteration (0, 1, 2, or 3) looked best to you
+
+chosen_blocks = variations[CHOSEN_ITERATION]
+
+meshes = []
+for b in chosen_blocks:
+    box = trimesh.creation.box(extents=b["size"])
+    offset = np.array(b["position"]) + np.array(b["size"]) / 2
+    box.apply_translation(offset)
+    meshes.append(box)
+
+combined = trimesh.util.concatenate(meshes)
+
+output_dir = '/content/drive/MyDrive/form/massing_exports'
+os.makedirs(output_dir, exist_ok=True)
+
+obj_path = os.path.join(output_dir, f'chosen_iteration_{CHOSEN_ITERATION}.obj')
+combined.export(obj_path)
+print(f"Saved to Drive: {obj_path}")
+
+from google.colab import files
+files.download(obj_path)
+
+combined.show()
+
+# ---- SETUP ----
+!pip install trimesh -q
+
+import json
+import os
+import trimesh
+import numpy as np
+import matplotlib.pyplot as plt
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+if os.path.exists(DB_PATH):
+    with open(DB_PATH, 'r') as f:
+        form_db = json.load(f)
+else:
+    form_db = {}
+
+def save_database():
+    with open(DB_PATH, 'w') as f:
+        json.dump(form_db, f, indent=2)
+
+
+def add_form(image_filename, blocks, category, notes=""):
+    form_db[image_filename] = {"blocks": blocks, "category": category, "notes": notes}
+    save_database()
+    print(f"Saved '{image_filename}' as category '{category}'.")
+
+
+def draw_blocks(ax, blocks):
+    for b in blocks:
+        x, y, z = b["position"]
+        dx, dy, dz = b["size"]
+        corners = np.array([
+            [x, y, z], [x+dx, y, z], [x+dx, y+dy, z], [x, y+dy, z],
+            [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
+        ])
+        edges = [(0,1),(1,2),(2,3),(3,0), (4,5),(5,6),(6,7),(7,4), (0,4),(1,5),(2,6),(3,7)]
+        for e in edges:
+            p1, p2 = corners[e[0]], corners[e[1]]
+            ax.plot(*zip(p1, p2), color='black')
+
+
+def combine_forms(filenames, spacing=1.0):
+    combined_blocks = []
+    z_cursor = 0.0
+    for name in filenames:
+        entry = form_db[name]
+        for b in entry["blocks"]:
+            combined_blocks.append({
+                "name": f"{name}_{b['name']}",
+                "size": b["size"],
+                "position": (b["position"][0], b["position"][1], b["position"][2] + z_cursor)
+            })
+        max_height = max(b["position"][2] + b["size"][2] for b in entry["blocks"])
+        z_cursor += max_height + spacing
+    return combined_blocks
+
+
+def preview_and_export(blocks, output_name="combined_form"):
+    fig = plt.figure(figsize=(6, 6))
+    ax = fig.add_subplot(111, projection='3d')
+    draw_blocks(ax, blocks)
+    ax.set_title(output_name)
+    ax.set_box_aspect([1,1,1])
+    plt.show()
+
+    meshes = []
+    for b in blocks:
+        box = trimesh.creation.box(extents=b["size"])
+        offset = np.array(b["position"]) + np.array(b["size"]) / 2
+        box.apply_translation(offset)
+        meshes.append(box)
+    combined_mesh = trimesh.util.concatenate(meshes)
+
+    output_dir = '/content/drive/MyDrive/form/massing_exports'
+    os.makedirs(output_dir, exist_ok=True)
+    obj_path = os.path.join(output_dir, f'{output_name}.obj')
+    combined_mesh.export(obj_path)
+    print(f"Exported: {obj_path}")
+
+    from google.colab import files
+    files.download(obj_path)
+    return combined_mesh
+
+
+# ---- TAG YOUR EXISTING FORM ----
+add_form(
+    image_filename="form_02.jpg",
+    blocks=[
+        {"name": "base",    "size": (4.0, 3.0, 2.0), "position": (0, 0, 0)},
+        {"name": "top_box", "size": (2.0, 2.0, 1.5), "position": (1.0, 0.5, 2.0)}
+    ],
+    category="base",
+    notes="Base block with smaller box on top"
+)
+
+# ---- ADD A SECOND FORM TO COMBINE WITH (edit filename + dimensions to a REAL image from your library) ----
+add_form(
+    image_filename="form_05.jpg",   # <-- change to an actual image filename you have
+    blocks=[
+        {"name": "connector", "size": (1.5, 1.5, 1.0), "position": (0, 0, 0)}
+    ],
+    category="connector",
+    notes="Simple connector piece"
+)
+
+# ---- COMBINE THEM AND EXPORT ----
+result_blocks = combine_forms(["form_02.jpg", "form_05.jpg"])
+preview_and_export(result_blocks, output_name="my_first_combined_design")
+
+!pip install trimesh -q
+
+import json
+import os
+import trimesh
+import numpy as np
+import matplotlib.pyplot as plt
+import random
+
+DB_PATH = '/content/drive/MyDrive/form/form_database.json'
+
+if os.path.exists(DB_PATH):
+    with open(DB_PATH, 'r') as f:
+        form_db = json.load(f)
+else:
+    form_db = {}
+
+def save_database():
+    with open(DB_PATH, 'w') as f:
+        json.dump(form_db, f, indent=2)
+
+def add_form(image_filename, blocks, category, notes=""):
+    form_db[image_filename] = {"blocks": blocks, "category": category, "notes": notes}
+    save_database()
+    print(f"Saved '{image_filename}' as category '{category}'.")
+
+print(f"Loaded {len(form_db)} form(s) from database.")
+
+def draw_blocks(ax, blocks):
+    for b in blocks:
+        x, y, z = b["position"]
+        dx, dy, dz = b["size"]
+        corners = np.array([
+            [x, y, z], [x+dx, y, z], [x+dx, y+dy, z], [x, y+dy, z],
+            [x, y, z+dz], [x+dx, y, z+dz], [x+dx, y+dy, z+dz], [x, y+dy, z+dz]
+        ])
+        edges = [(0,1),(1,2),(2,3),(3,0), (4,5),(5,6),(6,7),(7,4), (0,4),(1,5),(2,6),(3,7)]
+        for e in edges:
+            p1, p2 = corners[e[0]], corners[e[1]]
+            ax.plot(*zip(p1, p2), color='black')
+
+def generate_combination_iterations(filenames, num_variations=4,
+                                     spacing_range=(0.5, 2.0), offset_range=0.5):
+    all_variations = []
+
+    for _ in range(num_variations):
+        combined_blocks = []
+        z_cursor = 0.0
+        spacing = random.uniform(*spacing_range)
+
+        for name in filenames:
+            entry = form_db[name]
+            x_shift = random.uniform(-offset_range, offset_range)
+            y_shift = random.uniform(-offset_range, offset_range)
+
+            for b in entry["blocks"]:
+                combined_blocks.append({
+                    "name": f"{name}_{b['name']}",
+                    "size": b["size"],
+                    "position": (
+                        round(b["position"][0] + x_shift, 2),
+                        round(b["position"][1] + y_shift, 2),
+                        round(b["position"][2] + z_cursor, 2)
+                    )
+                })
+
+            max_height = max(b["position"][2] + b["size"][2] for b in entry["blocks"])
+            z_cursor += max_height + spacing
+
+        all_variations.append(combined_blocks)
+
+    return all_variations
+def preview_combinations(variations):
+    fig = plt.figure(figsize=(5 * len(variations), 5))
+    for i, blocks in enumerate(variations):
+        ax = fig.add_subplot(1, len(variations), i + 1, projection='3d')
+        draw_blocks(ax, blocks)
+        ax.set_title(f"Combo {i}")
+        ax.set_box_aspect([1,1,1])
+    plt.tight_layout()
+    plt.show()
+
+def export_combination(blocks, output_name="chosen_combination"):
+    meshes = []
+    for b in blocks:
+        box = trimesh.creation.box(extents=b["size"])
+        offset = np.array(b["position"]) + np.array(b["size"]) / 2
+        box.apply_translation(offset)
+        meshes.append(box)
+    combined_mesh = trimesh.util.concatenate(meshes)
+
+    output_dir = '/content/drive/MyDrive/form/massing_exports'
+    os.makedirs(output_dir, exist_ok=True)
+    obj_path = os.path.join(output_dir, f'{output_name}.obj')
+    combined_mesh.export(obj_path)
+    print(f"Exported: {obj_path}")
+
+    from google.colab import files
+    files.download(obj_path)
+
+    combined_mesh.show()
+    return combined_mesh
+
+forms_to_combine = ["form_02.jpg", "form_05.jpg"]   # <-- change to your real saved filenames
+
+combo_variations = generate_combination_iterations(forms_to_combine, num_variations=4)
+
+preview_combinations(combo_variations)
+
+print("\nLook at 'Combo 0' through 'Combo 3' above and decide which one you like.")
